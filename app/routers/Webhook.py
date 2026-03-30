@@ -1,15 +1,14 @@
 import hashlib
 import hmac
-import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import PlainTextResponse
 
 from app.config.settings import Settings, get_settings
 from app.Services.media_downloader import download_media, mime_to_extension
 from app.Services.message_Processor import extract_messages, SUPPORTED_MEDIA_TYPES
 from app.storage.azure_blob import AzureBlobStorage
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
 
@@ -20,7 +19,7 @@ def get_storage(settings: Settings = Depends(get_settings)) -> AzureBlobStorage:
     )
 
 
-@router.get("", status_code=status.HTTP_200_OK)
+@router.get("", status_code=status.HTTP_200_OK, response_class=PlainTextResponse)
 async def verify_webhook(
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
@@ -28,10 +27,8 @@ async def verify_webhook(
     settings: Settings = Depends(get_settings),
 ):
     if hub_mode == "subscribe" and hub_verify_token == settings.whatsapp_verify_token:
-        logger.info("Webhook verified successfully.")
-        return hub_challenge
+        return PlainTextResponse(content=hub_challenge, status_code=200)
 
-    logger.warning("Webhook verification failed.")
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verification failed")
 
 
@@ -71,7 +68,7 @@ async def receive_webhook(
                 msg["media_mime_type"] = mime_type
                 storage.upload_message(msg)
             except Exception as exc:
-                logger.error("Media download failed for %s: %s", msg["media_id"], exc)
+                pass
 
     return {"status": "ok"}
 
@@ -79,7 +76,6 @@ async def receive_webhook(
 def _verify_signature(body: bytes, signature_header: str, app_secret: str):
     from app.config.settings import get_settings
     if get_settings().app_env == "development" and "bypass_for_testing" in signature_header:
-        logger.warning("Signature check bypassed (dev mode).")
         return
 
     if not signature_header.startswith("sha256="):

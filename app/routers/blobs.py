@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from app.config.settings import Settings, get_settings
 from app.storage.azure_blob import AzureBlobStorage
 
@@ -39,3 +40,55 @@ def get_blob_content(
         return json.loads(content)
     except Exception:
         return {"raw": content.decode("utf-8", errors="replace")}
+
+
+class DeleteMessageRequest(BaseModel):
+    path: str  # blob path of the message JSON
+
+
+@router.delete("")
+def delete_message(
+    body: DeleteMessageRequest,
+    storage: AzureBlobStorage = Depends(get_storage),
+):
+    """Delete a message blob and its associated media blob (if any)."""
+    try:
+        # Read the message to find any linked media
+        blob_client = storage._client.get_blob_client(
+            container=storage._container, blob=body.path
+        )
+        try:
+            content = blob_client.download_blob().readall()
+            msg = json.loads(content)
+            media_id = msg.get("media_id")
+            conversation_id = msg.get("conversation_id")
+            timestamp = msg.get("timestamp", 0)
+        except Exception:
+            media_id = None
+
+        # Delete the message JSON blob
+        blob_client.delete_blob()
+
+        # Delete associated media blob if present
+        deleted_media = False
+        if media_id and conversation_id and timestamp:
+            from datetime import datetime, timezone
+            dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            date_prefix = dt.strftime("%Y/%m/%d")
+            # Try common extensions
+            for ext in ["jpg", "png", "mp4", "ogg", "mp3", "pdf", "webp", "3gp", "m4a", "bin"]:
+                media_path = f"{date_prefix}/{conversation_id}/media/{media_id}.{ext}"
+                try:
+                    media_client = storage._client.get_blob_client(
+                        container=storage._container, blob=media_path
+                    )
+                    media_client.delete_blob()
+                    deleted_media = True
+                    break
+                except Exception:
+                    continue
+
+        return {"status": "deleted", "path": body.path, "media_deleted": deleted_media}
+
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to delete: {str(e)}")

@@ -1,11 +1,8 @@
 import json
-import logging
 from datetime import datetime, timezone
 
 from azure.storage.blob import BlobServiceClient, ContentSettings
 from azure.core.exceptions import AzureError
-
-logger = logging.getLogger(__name__)
 
 
 class AzureBlobStorage:
@@ -19,9 +16,7 @@ class AzureBlobStorage:
             container_client = self._client.get_container_client(self._container)
             if not container_client.exists():
                 container_client.create_container()
-                logger.info("Created container: %s", self._container)
         except AzureError as e:
-            logger.error("Failed to ensure container: %s", e)
             raise
 
     def _date_prefix(self, ts: int) -> str:
@@ -37,7 +32,6 @@ class AzureBlobStorage:
         content = json.dumps(message, ensure_ascii=False, indent=2).encode("utf-8")
 
         self._upload_bytes(blob_path, content, content_type="application/json")
-        logger.info("Stored message: %s", blob_path)
         return blob_path
 
     def upload_media(
@@ -53,7 +47,6 @@ class AzureBlobStorage:
             f"{self._date_prefix(timestamp)}/{conversation_id}/media/{media_id}.{extension}"
         )
         self._upload_bytes(blob_path, media_bytes, content_type=mime_type)
-        logger.info("Stored media: %s", blob_path)
         return blob_path
 
     def _upload_bytes(self, blob_path: str, data: bytes, content_type: str):

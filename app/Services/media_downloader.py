@@ -1,7 +1,4 @@
-import logging
 import httpx
-
-logger = logging.getLogger(__name__)
 
 WHATSAPP_MEDIA_URL = "https://graph.facebook.com/v19.0/{media_id}"
 
@@ -19,8 +16,6 @@ async def download_media(media_id: str, access_token: str) -> tuple[bytes, str]:
 
         download_url: str = meta["url"]
         mime_type: str = meta.get("mime_type", "application/octet-stream")
-
-        logger.info("Downloading media %s (%s)", media_id, mime_type)
 
         media_resp = await client.get(download_url, headers=headers)
         media_resp.raise_for_status()

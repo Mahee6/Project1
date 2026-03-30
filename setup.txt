@@ -1,0 +1,11 @@
+0. source venv/bin/activate
+
+2. Run Backend:
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+3. Run Frontend:
+   cd frontend
+   npm run dev
+
+
+

@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     azure_storage_connection_string: str
     azure_blob_container_name: str = "whatsapp-archive"
 
+    frontend_url: str = "http://localhost:5173"
     app_env: str = "development"
     log_level: str = "INFO"
 
