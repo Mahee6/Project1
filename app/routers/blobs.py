@@ -1,5 +1,6 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query
+import mimetypes
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Response
 from pydantic import BaseModel
 from app.config.settings import Settings, get_settings
 from app.storage.azure_blob import AzureBlobStorage
@@ -35,11 +36,52 @@ def get_blob_content(
     blob_client = storage._client.get_blob_client(
         container=storage._container, blob=path
     )
-    content = blob_client.download_blob().readall()
+    
     try:
-        return json.loads(content)
-    except Exception:
-        return {"raw": content.decode("utf-8", errors="replace")}
+        content = blob_client.download_blob().readall()
+        
+        # If it's a JSON file (the metadata), return as JSON
+        if path.endswith('.json'):
+            try:
+                return json.loads(content)
+            except Exception:
+                return {"raw": content.decode("utf-8", errors="replace")}
+        
+        # Otherwise, return as a binary response with correct MIME type
+        mime_type, _ = mimetypes.guess_type(path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+            
+        return Response(content=content, media_type=mime_type)
+        
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Blob not found: {str(e)}")
+
+
+@router.post("/upload")
+async def upload_blob(
+    file: UploadFile = File(...),
+    prefix: str = Query("uploads"),
+    storage: AzureBlobStorage = Depends(get_storage),
+):
+    """Upload a file to Azure Blob Storage and return its path."""
+    try:
+        content = await file.read()
+        # Sanitize filename
+        filename = file.filename.replace(" ", "_")
+        blob_path = f"{prefix}/{filename}"
+        
+        storage._upload_bytes(blob_path, content, content_type=file.content_type)
+        
+        return {
+            "status": "success",
+            "path": blob_path,
+            "filename": filename,
+            "content_type": file.content_type,
+            "size": len(content)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 class DeleteMessageRequest(BaseModel):
