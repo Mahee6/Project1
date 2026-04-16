@@ -68,7 +68,10 @@ async def receive_webhook(
                 msg["media_mime_type"] = mime_type
                 storage.upload_message(msg)
             except Exception as exc:
-                pass
+                # Log the error but continue processing
+                print(f"Failed to download media {msg.get('media_id')}: {exc}")
+                import traceback
+                traceback.print_exc()
 
     return {"status": "ok"}
 

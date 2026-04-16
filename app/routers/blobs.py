@@ -84,6 +84,36 @@ async def upload_blob(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+@router.get("/media-proxy")
+async def proxy_media(
+    media_id: str = Query(...),
+    storage: AzureBlobStorage = Depends(get_storage),
+    settings: Settings = Depends(get_settings),
+):
+    """Fetch media from WhatsApp API on-demand and cache it to blob storage."""
+    import httpx
+    from app.Services.media_downloader import download_media, mime_to_extension
+
+    # First check if it's already in storage by scanning for the media_id
+    container_client = storage._client.get_container_client(storage._container)
+    for blob in container_client.list_blobs(name_starts_with=""):
+        if f"/media/{media_id}." in blob.name:
+            # Found it — serve directly
+            blob_client = storage._client.get_blob_client(
+                container=storage._container, blob=blob.name
+            )
+            content = blob_client.download_blob().readall()
+            mime_type, _ = mimetypes.guess_type(blob.name)
+            return Response(content=content, media_type=mime_type or "application/octet-stream")
+
+    # Not in storage — fetch from WhatsApp
+    try:
+        media_bytes, mime_type = await download_media(media_id, settings.whatsapp_access_token)
+        return Response(content=media_bytes, media_type=mime_type)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Media not available: {str(e)}")
+
+
 class DeleteMessageRequest(BaseModel):
     path: str  # blob path of the message JSON
 
