@@ -154,6 +154,7 @@ async def send_image_message(
             "receiving_phone_number_id": None,
             "raw": result,
             "media_id": request.media_id,
+            "media_link": request.media_link,
             "media_mime_type": None,
             "location": None,
             "contacts_shared": None,
@@ -197,6 +198,7 @@ async def send_video_message(
             "receiving_phone_number_id": None,
             "raw": result,
             "media_id": request.media_id,
+            "media_link": request.media_link,
             "media_mime_type": None,
             "location": None,
             "contacts_shared": None,
@@ -218,6 +220,7 @@ async def send_video_message(
 async def send_document_message(
     request: DocumentMessageRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_document(
@@ -227,6 +230,30 @@ async def send_document_message(
             caption=request.caption,
             filename=request.filename,
         )
+
+        sent_message = {
+            "message_id": result.get("messages", [{}])[0].get("id", f"sent_{int(time.time())}"),
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "document",
+            "text_body": None,
+            "caption": request.caption,
+            "filename": request.filename,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": request.document_id,
+            "media_link": request.document_link,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": None,
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
@@ -239,11 +266,35 @@ async def send_document_message(
 async def send_audio_message(
     request: MediaMessageRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_audio(
             to=request.to, audio_id=request.media_id, audio_link=request.media_link
         )
+
+        sent_message = {
+            "message_id": result.get("messages", [{}])[0].get("id", f"sent_{int(time.time())}"),
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "audio",
+            "text_body": None,
+            "caption": None,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": request.media_id,
+            "media_link": request.media_link,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": None,
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
@@ -256,6 +307,7 @@ async def send_audio_message(
 async def send_template_message(
     request: TemplateMessageRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_template(
@@ -264,6 +316,28 @@ async def send_template_message(
             language_code=request.language_code,
             components=request.components,
         )
+
+        sent_message = {
+            "message_id": result.get("messages", [{}])[0].get("id", f"sent_{int(time.time())}"),
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "template",
+            "text_body": f"Template: {request.template_name}",
+            "caption": None,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": None,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": None,
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
@@ -276,6 +350,7 @@ async def send_template_message(
 async def send_button_message(
     request: ButtonMessageRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_interactive_buttons(
@@ -285,6 +360,28 @@ async def send_button_message(
             header_text=request.header_text,
             footer_text=request.footer_text,
         )
+
+        sent_message = {
+            "message_id": result.get("messages", [{}])[0].get("id", f"sent_{int(time.time())}"),
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "interactive",
+            "text_body": request.body_text,
+            "caption": None,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": None,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": None,
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
@@ -297,6 +394,7 @@ async def send_button_message(
 async def send_list_message(
     request: ListMessageRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_interactive_list(
@@ -307,6 +405,28 @@ async def send_list_message(
             header_text=request.header_text,
             footer_text=request.footer_text,
         )
+
+        sent_message = {
+            "message_id": result.get("messages", [{}])[0].get("id", f"sent_{int(time.time())}"),
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "interactive",
+            "text_body": request.body_text,
+            "caption": None,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": None,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": None,
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
@@ -368,11 +488,37 @@ async def send_location_message(
 async def send_reaction(
     request: ReactionRequest,
     sender: WhatsAppSender = Depends(get_sender),
+    storage: AzureBlobStorage = Depends(get_storage),
 ):
     try:
         result = await sender.send_reaction(
             to=request.to, message_id=request.message_id, emoji=request.emoji
         )
+
+        sent_message = {
+            "message_id": f"react_{int(time.time())}",
+            "conversation_id": f"conv_{request.to}",
+            "user": None,
+            "timestamp": int(time.time()),
+            "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+            "message_type": "reaction",
+            "text_body": None,
+            "caption": None,
+            "receiving_phone_number_id": None,
+            "raw": result,
+            "media_id": None,
+            "media_mime_type": None,
+            "location": None,
+            "contacts_shared": None,
+            "reaction": {
+                "message_id": request.message_id,
+                "emoji": request.emoji,
+            },
+            "link_preview": None,
+        }
+
+        storage.upload_message(sent_message)
+
         return {"status": "sent", "result": result}
     except Exception as e:
         raise HTTPException(
